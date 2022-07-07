@@ -1,4 +1,4 @@
-function Y = SASNE(data)
+function [Y,Z] = SASNE(data)
 % SASNE - shape aware stochastic neighbour embedding
 % Takes as input a HD data matrix (rows are observations, columns features)
 % Returns 2D embedding Y

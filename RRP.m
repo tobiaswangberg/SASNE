@@ -12,7 +12,7 @@ function plot = RRP(D1,D2)
     title(['$\overline{R}=$ ',num2str(score,3)],'interpreter','latex')
 end
 
-function [plt] =  smoothed2dhist(data,x_width,y_width,fast)
+function [plt] =  smoothed_2d_hist(data,x_width,y_width,fast)
 
 if ~exist('x_width', 'var')
     x_width = 1;
