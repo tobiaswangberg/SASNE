@@ -1,1 +1,1 @@
-# SASNE
+# SASNE - Shape Aware Stochastic Neighbor Embedding
