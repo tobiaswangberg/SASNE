@@ -6,11 +6,15 @@ function [Y,Z] = SASNE(data)
     disp('constructing graph...')
     tic;
     [W,~] = construct_graph(data,true,true,5);
-    t_graph = toc;
+    toc
+    t_graph_constr = toc;
+    disp('computing graph distance...')
     tic;
     [Z,lambda] = get_symbiharmonic_coords(W,true);
+    %[Z,lambda] = get_biharmonic_coords(W,true);
+    %[Z,lambda] = get_CTD_coords(W,true);
     clear W
-    t_diag = toc;
+    t_graph_dist = toc;
     init_Y = 1e-4.*Z(:,1:2)*sqrt(lambda(2));
     perplexity = floor(0.9*n);
     disp('Computing tsne embedding...')
@@ -20,11 +24,138 @@ function [Y,Z] = SASNE(data)
         statset('TolFun',1e-100),'Algorithm','exact');
     t_tsne = toc;
     
-    t_total = t_graph + t_diag + t_tsne;
+    t_total = t_graph_constr + t_graph_dist + t_tsne;
     
     disp(['Total running time ' num2str(t_total) ' seconds']);
 end
 
+
+%%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH DISTANCE %%%%%%%%%%%%%
+function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
+    
+    tic
+    if ~issparse(W)
+        W = sparse(W); 
+    end
+  
+
+    d = sum(W,2);
+
+    sqrt_dinv = 1./sqrt(d);
+    n = size(W,1);
+    Wnorm = zeros(n,n); % compute normalised weight matrix
+    nnzs = nnz(W);
+    [r,c] = find(W);
+ 
+    for i = 1:nnzs
+            Wnorm(r(i),c(i)) = W(r(i),c(i)) * sqrt_dinv(r(i))*sqrt_dinv(c(i));
+    end
+
+    I = eye(size(Wnorm,1));
+    Lsym = I - Wnorm;
+    
+    if ~exact
+        sum_lambda = trace(Lsym);
+        N = floor(0.05*n);
+        [V, lambda] = eigs(sparse(Lsym),N,1e-10);
+        disp([num2str(sum(lambda(:))/sum_lambda),' % of variance explained'])
+    end
+
+   if exact
+       [V, lambda] = eig(full(Lsym));
+   end
+    V = real(V);
+    lambda = real(lambda);  
+    lambdad = diag(lambda);
+    
+    [lambdad,idx] = sort(lambdad,'ascend');
+    V = V(:,idx);
+    
+    lambdainv = sparse(diag(1./(lambdad(2:end))));
+    
+    vol = sum(sum(W));
+
+
+    Z = sqrt(vol) * sparse(diag(sqrt_dinv))*V(:,2:end)*lambdainv;
+    toc
+
+end
+
+function [Z,lambdad] = get_CTD_coords(W,exact)
+
+    tic
+    d = sum(W,2);
+
+    sqrt_dinv = 1./sqrt(d);
+    n = size(W,1);
+    Wnorm = zeros(n,n); % compute normalised weight matrix
+    nnzs = nnz(W);
+    [r,c] = find(W);
+ 
+    for i = 1:nnzs
+            Wnorm(r(i),c(i)) = W(r(i),c(i)) * sqrt_dinv(r(i))*sqrt_dinv(c(i));
+    end
+
+    I = eye(size(Wnorm,1));
+    Lsym = I - Wnorm;
+    if ~exact
+        N = floor(0.05*n);
+        [V, lambda] = eigs(sparse(Lsym),N,1e-10);
+   end
+
+   if exact
+       [V, lambda] = eig(full(Lsym));
+   end
+ 
+    %L = diag(d) - W;
+    [V, lambda] = eig(Lsym);
+    %[V, lambda] = eig(L);
+     V = real(V);
+   lambda = real(lambda);
+    lambdad = diag(lambda);
+    [lambdad,idx] = sort(lambdad,'ascend');
+    V = V(:,idx);
+
+    lambdainv = diag(1./sqrt(lambdad(2:end)));
+    
+    vol = sum(sum(W));
+
+
+    Z = sqrt(vol) * diag(sqrt_dinv)*V(:,2:end)*lambdainv;
+    toc
+
+end
+
+function [Z,lambdad] = get_biharmonic_coords(W,exact)
+    tic
+    d = sum(W,2);
+    sqrt_dinv = 1./sqrt(d);
+
+
+    L = diag(d) - W;
+    
+    if ~exact
+        N = floor(0.05*n);
+        [V, lambda] = eigs(sparse(L),N,1e-10);
+    end
+
+    if exact
+       [V, lambda] = eig(full(L));
+    end
+
+    lambdad = diag(lambda);
+    [lambdad,idx] = sort(lambdad,'ascend');
+    V = V(:,idx);
+    lambdainv = diag(1./(lambdad(2:end)));
+    disp('Computing biharmonic coordinates...')
+    vol = sum(sum(W));
+
+    Z = V(:,2:end)*lambdainv;
+    toc
+
+end
+
+%%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH CONSTRUCTION %%%%%%%%%%%%%
 function [W,A] = construct_graph(data,linear_search,knn,min_k)
     smallest_conn = @smallest_conn;
     D = pdist(data);
@@ -147,7 +278,24 @@ function connected = is_connected(A)
    
  
 end
+function [comps,count] = find_comps(A,k)
+    n = size(A,1);
 
+    
+    unmarked = 1:n;
+    count = 0;
+    comps = ones(1,n);
+    while ~isempty(unmarked)
+        marked = [];
+        v_curr = unmarked(1);
+        marked = union(v_curr,marked);
+        unmarked = setdiff(unmarked,v_curr);
+        [marked,unmarked] = dfs(v_curr,marked,unmarked,A);
+        count = count + 1;
+        comps(marked) = count*ones(length(marked),1);
+    end
+
+end
 
 function [comp,marked,unmarked] = dfs(v,marked,unmarked,A)
     NNs = A(v,:);
@@ -166,51 +314,3 @@ function [comp,marked,unmarked] = dfs(v,marked,unmarked,A)
     end
 end
 
-function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
-    disp('computing symmetric biharmonic coordinates')
-    tic
-    if ~issparse(W)
-        W = sparse(W); 
-    end
-  
-
-    d = sum(W,2);
-
-    sqrt_dinv = 1./sqrt(d);
-    n = size(W,1);
-    Wnorm = zeros(n,n); % compute normalised weight matrix
-    nnzs = nnz(W);
-    [r,c] = find(W);
- 
-    for i = 1:nnzs
-            Wnorm(r(i),c(i)) = W(r(i),c(i)) * sqrt_dinv(r(i))*sqrt_dinv(c(i));
-    end
-
-    I = eye(size(Wnorm,1));
-    Lsym = I - Wnorm;
-    disp('computing eigenspectrum')
-    
-    if ~exact
-        sum_lambda = trace(Lsym);
-        N = floor(0.05*n);
-        [V, lambda] = eigs(sparse(Lsym),N,1e-10);
-        disp([num2str(sum(lambda(:))/sum_lambda),' % of variance explained'])
-    end
-
-   if exact
-       [V, lambda] = eig(full(Lsym));
-   end
-       
-    lambdad = diag(lambda);
-    [lambdad,idx] = sort(lambdad,'ascend');
-    V = V(:,idx);
-
-    lambdainv = sparse(diag(1./(lambdad(2:end))));
-    
-    vol = sum(sum(W));
-
-
-    Z = sqrt(vol) * sparse(diag(sqrt_dinv))*V(:,2:end)*lambdainv;
-    toc
-
-end
