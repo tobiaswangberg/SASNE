@@ -14,6 +14,7 @@ function [Y,Z] = SASNE(data)
     %[Z,lambda] = get_biharmonic_coords(W,true);
     %[Z,lambda] = get_CTD_coords(W,true);
     clear W
+    toc
     t_graph_dist = toc;
     init_Y = 1e-4.*Z(:,1:2)*sqrt(lambda(2));
     perplexity = floor(0.9*n);
@@ -22,6 +23,7 @@ function [Y,Z] = SASNE(data)
     Y = tsne(Z,'InitialY',init_Y,'Exaggeration',12,'LearnRate',...
         n/12,'Perplexity',perplexity,'Verbose',0,'Options',...
         statset('TolFun',1e-100),'Algorithm','exact');
+    toc
     t_tsne = toc;
     
     t_total = t_graph_constr + t_graph_dist + t_tsne;
@@ -32,38 +34,27 @@ end
 
 %%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH DISTANCE %%%%%%%%%%%%%
 function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
-    
-    tic
     if ~issparse(W)
         W = sparse(W); 
     end
-  
-
-    d = sum(W,2);
-
-    sqrt_dinv = 1./sqrt(d);
-    n = size(W,1);
-    Wnorm = zeros(n,n); % compute normalised weight matrix
-    nnzs = nnz(W);
-    [r,c] = find(W);
- 
-    for i = 1:nnzs
-            Wnorm(r(i),c(i)) = W(r(i),c(i)) * sqrt_dinv(r(i))*sqrt_dinv(c(i));
-    end
-
-    I = eye(size(Wnorm,1));
-    Lsym = I - Wnorm;
     
+    Lsym = compute_Lsym(W);
+    if Lsym ~= Lsym'
+        disp('Warning symmetric Laplacian is not symmetric!')
+    end
+   
+    %% For experimenting with truncation
     if ~exact
         sum_lambda = trace(Lsym);
         N = floor(0.05*n);
         [V, lambda] = eigs(sparse(Lsym),N,1e-10);
         disp([num2str(sum(lambda(:))/sum_lambda),' % of variance explained'])
     end
-
+    %%
    if exact
        [V, lambda] = eig(full(Lsym));
    end
+   % MATLAB function sometimes returns small imaginary part
     V = real(V);
     lambda = real(lambda);  
     lambdad = diag(lambda);
@@ -73,31 +64,19 @@ function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
     
     lambdainv = sparse(diag(1./(lambdad(2:end))));
     
-    vol = sum(sum(W));
+    deg = sum(W);
+    vol = sum(deg);
+    sqrt_dinv = 1./sqrt(deg);
 
-
+    
     Z = sqrt(vol) * sparse(diag(sqrt_dinv))*V(:,2:end)*lambdainv;
-    toc
 
 end
 
 function [Z,lambdad] = get_CTD_coords(W,exact)
 
     tic
-    d = sum(W,2);
-
-    sqrt_dinv = 1./sqrt(d);
-    n = size(W,1);
-    Wnorm = zeros(n,n); % compute normalised weight matrix
-    nnzs = nnz(W);
-    [r,c] = find(W);
- 
-    for i = 1:nnzs
-            Wnorm(r(i),c(i)) = W(r(i),c(i)) * sqrt_dinv(r(i))*sqrt_dinv(c(i));
-    end
-
-    I = eye(size(Wnorm,1));
-    Lsym = I - Wnorm;
+    Lsym = compute_Lsym(W);
     if ~exact
         N = floor(0.05*n);
         [V, lambda] = eigs(sparse(Lsym),N,1e-10);
@@ -107,20 +86,21 @@ function [Z,lambdad] = get_CTD_coords(W,exact)
        [V, lambda] = eig(full(Lsym));
    end
  
-    %L = diag(d) - W;
     [V, lambda] = eig(Lsym);
-    %[V, lambda] = eig(L);
-     V = real(V);
-   lambda = real(lambda);
+
+    % MATLAB function sometimes returns 
+    V = real(V);
+    lambda = real(lambda);
     lambdad = diag(lambda);
     [lambdad,idx] = sort(lambdad,'ascend');
     V = V(:,idx);
 
     lambdainv = diag(1./sqrt(lambdad(2:end)));
     
-    vol = sum(sum(W));
-
-
+    
+    deg = sum(W);
+    vol = sum(deg);
+    sqrt_dinv = 1./sqrt(deg);
     Z = sqrt(vol) * diag(sqrt_dinv)*V(:,2:end)*lambdainv;
     toc
 
@@ -153,6 +133,27 @@ function [Z,lambdad] = get_biharmonic_coords(W,exact)
     Z = V(:,2:end)*lambdainv;
     toc
 
+end
+
+function Lsym = compute_Lsym(W)
+%%% Function takes as input symmetric weight matrix W and returns symmetric
+%%% symmetric Laplacian Lsym 
+    d = sum(W,2);
+
+    sqrt_dinv = 1./sqrt(d);
+    n = size(W,1);
+    % compute normalised weight matrix make use of sparsity to save some
+    % time
+    Wnorm = zeros(n,n); 
+    nnzs = nnz(W);
+    [r,c] = find(W);
+ 
+    for i = 1:nnzs
+            Wnorm(r(i),c(i)) = W(r(i),c(i)) * sqrt_dinv(r(i))*sqrt_dinv(c(i));
+    end
+
+    I = eye(size(Wnorm,1));
+    Lsym = I - Wnorm;
 end
 
 %%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH CONSTRUCTION %%%%%%%%%%%%%
