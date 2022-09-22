@@ -1,4 +1,4 @@
-function [Y,Z] = SASNE(data)
+function [Y,Z,W] = SASNE(data)
 % SASNE - shape aware stochastic neighbour embedding
 % Takes as input a HD data matrix (rows are observations, columns features)
 % Returns 2D embedding Y
@@ -10,15 +10,16 @@ function [Y,Z] = SASNE(data)
     t_graph_constr = toc;
     disp('computing graph distance...')
     tic;
+    % You can chose graph distance here
     [Z,lambda] = get_symbiharmonic_coords(W,true);
     %[Z,lambda] = get_biharmonic_coords(W,true);
     %[Z,lambda] = get_CTD_coords(W,true);
-    clear W
+    %clear W
     toc
     t_graph_dist = toc;
     init_Y = 1e-4.*Z(:,1:2)*sqrt(lambda(2));
     perplexity = floor(0.9*n);
-    disp('Computing tsne embedding...')
+    disp('computing tsne embedding...')
     tic;
     Y = tsne(Z,'InitialY',init_Y,'Exaggeration',12,'LearnRate',...
         n/12,'Perplexity',perplexity,'Verbose',0,'Options',...
@@ -158,7 +159,7 @@ end
 
 %%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH CONSTRUCTION %%%%%%%%%%%%%
 function [W,A] = construct_graph(data,linear_search,knn,min_k)
-    smallest_conn = @smallest_conn;
+ 
     D = pdist(data);
     Dsq = squareform(D);
     n = size(Dsq,1);
@@ -185,22 +186,19 @@ function A = smallest_conn(D,linear_search,knn,min_k,layer)
     if ~linear_search
         smallest_k = @smallest_k_binary;
     end
-    
-    find_comps = @find_comps;
-    is_connected = @is_connected;
    
     [~,ind] = sort(D);
 
     k = smallest_k(D,ind,min_k,knn);
     A = DtoA(D,k,ind,knn);
-    %disp(['Smallest k is ',int2str(k),' in layer ',layer])
+    disp(['Smallest k is ',int2str(k),' in layer ',layer])
     if k > min_k
         k_disconnect = k - 1;
         A_disconnect = DtoA(D,k_disconnect,ind,knn);
         [comps,N] = find_comps(A_disconnect,k_disconnect);
-        %disp(['we have ',int2str(N),' connected components for k-1 = ',int2str(k-1),' in layer ',layer])
+        disp(['we have ',int2str(N),' connected components for k-1 = ',int2str(k-1),' in layer ',layer])
         for i = 1:N
-            %disp(['Looking into component ',int2str(i)])
+            disp(['Looking into component ',int2str(i)])
             comp_ind = find(comps == i);
             sub_D = D(comp_ind,comp_ind);
             new_layer = [layer,'.',int2str(i)];
@@ -269,20 +267,21 @@ end
 function connected = is_connected(A)
     n = size(A,1);
 
-    marked = [];
-    unmarked = 1:n;
-    v_curr = unmarked(1);
-    marked = union(v_curr,marked);
-    unmarked = setdiff(unmarked,v_curr);
+    % initiliase the recursive dfs
+    marked = 1; 
+    unmarked = 2:n;
+    v_curr = 1;
+%     v_curr = unmarked(1);
+%     marked = union(v_curr,marked);
+%     unmarked = setdiff(unmarked,v_curr);
     [comp,marked,unmarked] = dfs(v_curr,marked,unmarked,A);
     connected = isempty(unmarked);
    
  
 end
+
 function [comps,count] = find_comps(A,k)
     n = size(A,1);
-
-    
     unmarked = 1:n;
     count = 0;
     comps = ones(1,n);
