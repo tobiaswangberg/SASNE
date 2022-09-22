@@ -28,8 +28,8 @@ The SASNE function takes as input a matrix, where rows are observations and colu
 
 For an example of how to apply SASNE run the following code in your MATLAB instance:
 
-    data = readmatrix('data/imbalanced_test.txt'); # read the data
-    sasne_out = SASNE(data); # run SASNE to create a 2-dimensional embedding
+    data = readmatrix('data/imbalanced_test.txt'); 
+    sasne_out = SASNE(data);[sasne_out,Z] = SASNE(data);
 
 To visualise the low dimensional embedding run the following command in MATLAB:
 
