@@ -1,4 +1,4 @@
-# SASNE - Shape Aware Stochastic Neighbor Embedding
+# SASNE - Shape-aware Stochastic Neighbor Embedding
 
 
 ### Introduction 
@@ -29,7 +29,7 @@ The SASNE function takes as input a matrix, where rows are observations and colu
 For an example of how to apply SASNE run the following code in your MATLAB instance:
 
     data = readmatrix('data/imbalanced_test.txt'); 
-    sasne_out = SASNE(data);[sasne_out,Z] = SASNE(data);
+    [sasne_out,Z] = SASNE(data);
 
 To visualise the low dimensional embedding run the following command in MATLAB:
 
