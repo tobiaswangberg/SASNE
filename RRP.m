@@ -13,6 +13,12 @@ function plot = RRP(D1,D2)
 end
 
 function [plt] =  smoothed_2d_hist(data,x_width,y_width,fast)
+% Takes as input a 2D data matrix, 
+% size of bins given by x_width and y_width. Density estimation is constant
+% within each bin.
+% boolean variable fast. If set to true smoothing is done with MATLAB's
+% built in linear smoothing. Otherwise a Gaussian kernel smoothing is done.
+% Returns the density plot
 
 if ~exist('x_width', 'var')
     x_width = 1;
@@ -105,6 +111,8 @@ ylabel('Rank error')
 end
 
 function pointwise_ranks = dist_to_rank(D)
+% takes as input distance matrix D and returns matrix of distance ranks
+% for each data point
     D = squareform(D);
     n = size(D,1);
     [~,ind] = sort(D);
