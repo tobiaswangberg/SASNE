@@ -1,7 +1,8 @@
 function [Y,Z,W] = SASNE(data)
 % SASNE - shape aware stochastic neighbour embedding
 % Takes as input a HD data matrix (rows are observations, columns features)
-% Returns 2D embedding Y
+% Returns 2D embedding Y, that original graph distance coordinates Z and
+% the graph weight matrix W.
     n = size(data,1);
     disp('constructing graph...')
     tic;
@@ -10,11 +11,12 @@ function [Y,Z,W] = SASNE(data)
     t_graph_constr = toc;
     disp('computing graph distance...')
     tic;
+
     % You can chose graph distance here
     [Z,lambda] = get_symbiharmonic_coords(W,true);
     %[Z,lambda] = get_biharmonic_coords(W,true);
     %[Z,lambda] = get_CTD_coords(W,true);
-    %clear W
+
     toc
     t_graph_dist = toc;
     init_Y = 1e-4.*Z(:,1:2)*sqrt(lambda(2));
@@ -35,6 +37,14 @@ end
 
 %%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH DISTANCE %%%%%%%%%%%%%
 function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
+% Computes the symmetric biharmonic graph distance coordinates
+% Takes as input a symmetric weight matrix W where entry (i,j) of W indicates
+% the similarity between node i and j along with the boolean argument
+% exact. If exact is set to false, then the distance is computed using only
+% the 5 % leading eigenvectors to save computational time.
+% Returns coordinates Z, the squared Euclidean distances between the column
+% vectors of Z is the biharmonic distance, computed using the symmetric 
+% Laplacian.
     if ~issparse(W)
         W = sparse(W); 
     end
@@ -55,7 +65,8 @@ function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
    if exact
        [V, lambda] = eig(full(Lsym));
    end
-   % MATLAB function sometimes returns small imaginary part
+   % MATLAB function sometimes returns small imaginary part for numerical
+   % reasons
     V = real(V);
     lambda = real(lambda);  
     lambdad = diag(lambda);
@@ -75,7 +86,13 @@ function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
 end
 
 function [Z,lambdad] = get_CTD_coords(W,exact)
-
+% Computes the commute time distance coordinates
+% Takes as input a symmetric weight matrix W where entry (i,j) of W indicates
+% the similarity between node i and j along with the boolean argument
+% exact. If exact is set to false, then the distance is computed using only
+% the 5 % leading eigenvectors to save computational time.
+% Returns coordinates Z, the squared Euclidean distances between the column
+% vectors of Z is the commute time distance.
     tic
     Lsym = compute_Lsym(W);
     if ~exact
@@ -89,7 +106,7 @@ function [Z,lambdad] = get_CTD_coords(W,exact)
  
     [V, lambda] = eig(Lsym);
 
-    % MATLAB function sometimes returns 
+    % MATLAB function sometimes returns small imaginary part
     V = real(V);
     lambda = real(lambda);
     lambdad = diag(lambda);
@@ -108,6 +125,13 @@ function [Z,lambdad] = get_CTD_coords(W,exact)
 end
 
 function [Z,lambdad] = get_biharmonic_coords(W,exact)
+% Computes the biharmonic coordinates
+% Takes as input a symmetric weight matrix W where entry (i,j) of W indicates
+% the similarity between node i and j along with the boolean argument
+% exact. If exact is set to false, then the distance is computed using only
+% the 5 % leading eigenvectors to save computational time.
+% Returns coordinates Z, the squared Euclidean distances between the column
+% vectors of Z is the biharmonic distance distance.
     tic
     d = sum(W,2);
     sqrt_dinv = 1./sqrt(d);
@@ -159,7 +183,20 @@ end
 
 %%%%%%%%%%%%% HELPER FUNCTION FOR GRAPH CONSTRUCTION %%%%%%%%%%%%%
 function [W,A] = construct_graph(data,linear_search,knn,min_k)
- 
+ % Function to create a graph representation of the data.
+ % The function takes as input a data matrix (rows observations, colums
+ % features), 
+ % boolean variable linear search. If this argument is set to true,
+ % the search for the smallest k such that the graph is connected is done 
+ % linearly by increasing k starting from a low value. Otherwise this is
+ % done by a binary search.
+ % boolean argument knn. If set to true then the graph is constructed by
+ % connecting the k nearest neighbors, otherwise a mutual kNN graph is
+ % constructured.
+ % integer argument min_k indicates the minimum numbers k nearest neighbors
+ % of the graph, so that the graph construction guarantees at least min_k 
+ % neighbors of each node are connected in the graph. 
+ % Returns the weight matrix W of the graph and binary adjacency matrix A.
     D = pdist(data);
     Dsq = squareform(D);
     n = size(Dsq,1);
@@ -191,11 +228,11 @@ function A = smallest_conn(D,linear_search,knn,min_k,layer)
 
     k = smallest_k(D,ind,min_k,knn);
     A = DtoA(D,k,ind,knn);
-    disp(['Smallest k is ',int2str(k),' in layer ',layer])
+    %disp(['Smallest k is ',int2str(k),' in layer ',layer])
     if k > min_k
         k_disconnect = k - 1;
         A_disconnect = DtoA(D,k_disconnect,ind,knn);
-        [comps,N] = find_comps(A_disconnect,k_disconnect);
+        [comps,N] = find_comps(A_disconnect);
         disp(['we have ',int2str(N),' connected components for k-1 = ',int2str(k-1),' in layer ',layer])
         for i = 1:N
             disp(['Looking into component ',int2str(i)])
@@ -271,16 +308,17 @@ function connected = is_connected(A)
     marked = 1; 
     unmarked = 2:n;
     v_curr = 1;
-%     v_curr = unmarked(1);
-%     marked = union(v_curr,marked);
-%     unmarked = setdiff(unmarked,v_curr);
+
     [comp,marked,unmarked] = dfs(v_curr,marked,unmarked,A);
     connected = isempty(unmarked);
    
  
 end
 
-function [comps,count] = find_comps(A,k)
+function [comps,count] = find_comps(A)
+% Takes as input an adjacency matrix A
+% returns the disconneted components of the graph comps and the number
+% of disconnected components.
     n = size(A,1);
     unmarked = 1:n;
     count = 0;
