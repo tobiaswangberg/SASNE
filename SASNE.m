@@ -12,7 +12,7 @@ function [Y,Z,W] = SASNE(data)
     disp('computing graph distance...')
     tic;
 
-    % You can chose graph distance here
+    % You can choose graph distance here
     [Z,lambda] = get_symbiharmonic_coords(W,true);
     %[Z,lambda] = get_biharmonic_coords(W,true);
     %[Z,lambda] = get_CTD_coords(W,true);
@@ -54,14 +54,14 @@ function [Z,lambdad] = get_symbiharmonic_coords(W,exact)
         disp('Warning symmetric Laplacian is not symmetric!')
     end
    
-    %% For experimenting with truncation
+   
     if ~exact
         sum_lambda = trace(Lsym);
         N = floor(0.05*n);
         [V, lambda] = eigs(sparse(Lsym),N,1e-10);
         disp([num2str(sum(lambda(:))/sum_lambda),' % of variance explained'])
     end
-    %%
+
    if exact
        [V, lambda] = eig(full(Lsym));
    end
@@ -197,21 +197,36 @@ function [W,A] = construct_graph(data,linear_search,knn,min_k)
  % of the graph, so that the graph construction guarantees at least min_k 
  % neighbors of each node are connected in the graph. 
  % Returns the weight matrix W of the graph and binary adjacency matrix A.
-    D = pdist(data);
+
+    % need to handle case when discrete data is not unique to avoid
+    % degenerate case when distance would be 0 between points.
+    [data_unique,ia,ic] = unique(data, 'rows', 'stable');
+    Cnts = accumarray(ic, 1);
+
+    D = pdist(data_unique);
     Dsq = squareform(D);
     n = size(Dsq,1);
     [~,ind] = sort(Dsq);
     
     A = smallest_conn(Dsq,linear_search,knn,min_k,'1');
     W = A;
-    D_5NN = zeros(n,5);
+    D_5NN = zeros(n,min_k);
     for i = 1:n
         D_5NN(i,:) = Dsq(i,ind(2:6,i));
     end
 
     q = quantile(D_5NN(:),0.9);
     Dsq = 6.31*Dsq/q; % normalise to avoid flat region of t-dist
-    W(A~=0) = 1./(1 + Dsq(A~= 0).^2);
+    
+    nnzs = nnz(A);
+    [r,c] = find(A);
+    W = A;
+ 
+    for i = 1:nnzs
+            W(r(i),c(i)) = 1/(1 + Dsq(r(i),c(i))^2)*Cnts(r(i))*Cnts(c(i));
+            W(c(i),r(i)) = W(r(i),c(i));
+    end
+    %W(A~=0) = 1./(1 + Dsq(A~= 0).^2);
     W = sparse(W);
  
 end
@@ -303,7 +318,6 @@ end
 
 function connected = is_connected(A)
     n = size(A,1);
-
     % initiliase the recursive dfs
     marked = 1; 
     unmarked = 2:n;
@@ -311,8 +325,6 @@ function connected = is_connected(A)
 
     [comp,marked,unmarked] = dfs(v_curr,marked,unmarked,A);
     connected = isempty(unmarked);
-   
- 
 end
 
 function [comps,count] = find_comps(A)
