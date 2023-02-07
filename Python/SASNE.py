@@ -15,6 +15,6 @@ def SASNE(data):
     perplexity = 0.9 * n
     embedding = TSNE(n_components=2,method='exact',init=init_Y,perplexity=perplexity).fit_transform(Z)
 
-    return embedding
+    return embedding,Z
 
 
