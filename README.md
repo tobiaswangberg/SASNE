@@ -54,11 +54,28 @@ For an example of how to apply SASNE run the following script in your terminal:
 
     import numpy as np
     import matplotlib.pyplot as plt
+    from SASNE import SASNE
+    from RRP import RRP
     
-    data = np.loadtxt('data/imbalanced_test.txt') 
+    # load data
+    data = np.loadtxt('../data/imbalanced_test.txt')
+    # compute embedding
     sasne_out = SASNE(data)
-    plt.scatter(sasne_out[:,0],sasne_out[:,1])
+    embedding = sasne_out[0]
+    # The squared Euclidean distance of the columns of Z gives the graph distance
+    Z = sasne_out[1]
+    D1 = squareform(pdist(embedding)) # distances in LD embedding
+    D2 = squareform(pdist(Z)) # Original graph distances
+    plt.subplot(1,2,1)
+    plt.scatter(embedding[:,0],embedding[:,1])
+    plt.xlabel('SASNE1')
+    plt.ylabel('SASNE2')
+    plt.subplot(1,2,2)
+    res = RRP(D1,D2) # evaluate the embedding with the RRP
+
+
     plt.show()
+
 
 ### Help
 
