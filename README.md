@@ -48,6 +48,8 @@ The same running example is found in the live script `running_example.mlx` found
 
 ### Tutorial Python
 
+To run the Python version the following libaries need to be istalled: `numpy`, `scipy`, `matplotlib` and `sklearn`.
+
 The SASNE function takes as input a numpy array, where rows are observations and columns are features. The program returns the two dimensional embedding.
 
 For an example of how to apply SASNE run the following script in your terminal:
