@@ -15,7 +15,8 @@ def RRP(D1,D2):
     Y = result[2]
     plt.pcolormesh(X[:-1],Y[:-1],data.T, cmap='inferno', shading='gouraud')
     plt.title('MARE = ' + str(round(score,4)))
-    plt.show()
+    plt.xlabel('Original rank')
+    plt.ylabel('Rank difference')
     return score
 
 def dist_to_rank(D):
